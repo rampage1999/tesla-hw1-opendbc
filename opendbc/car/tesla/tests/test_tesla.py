@@ -6,7 +6,7 @@ from opendbc.car.structs import CarParams
 from opendbc.car.tesla.interface import CarInterface
 from opendbc.car.tesla.fingerprints import FW_VERSIONS
 from opendbc.car.tesla.radar_interface import RADAR_START_ADDR
-from opendbc.car.tesla.values import CAR
+from opendbc.car.tesla.values import CAR, FSD_14_FW, LEGACY_CARS
 
 Ecu = CarParams.Ecu
 
@@ -51,7 +51,12 @@ PLATFORM_TO_CAR = {
 class TestTeslaFingerprint(unittest.TestCase):
   def test_fw_platform_code(self):
     # Every EPS FW must parse and its platform letter must match the car it's filed under.
+    # Legacy (HW1/HW2/HW3) EPS FW is raw/binary, not the modern comma-separated format below.
+    # TESLA_MODEL_S uses its own 'S'-prefixed FW convention (e.g. 'SPP003.6.0'), outside the
+    # E/Y/X platform-letter scheme this regex validates for the cars upstream defines.
     for car_model, ecus in FW_VERSIONS.items():
+      if car_model in LEGACY_CARS or car_model == CAR.TESLA_MODEL_S:
+        continue
       for fw in ecus.get((Ecu.eps, 0x730, None), []):
         m = FW_RE.match(fw)
 

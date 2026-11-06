@@ -3428,6 +3428,78 @@
     ],
     "package": "All"
   },
+  "Tesla Model S (with HW1) 2014-16": {
+    "platform": "TESLA_MODEL_S_HW1",
+    "make": "Tesla",
+    "brand": "tesla",
+    "model": "Model S (with HW1)",
+    "year": [
+      "2014",
+      "2015",
+      "2016"
+    ],
+    "package": "All"
+  },
+  "Tesla Model S (with HW2) 2017-19": {
+    "platform": "TESLA_MODEL_S_HW2",
+    "make": "Tesla",
+    "brand": "tesla",
+    "model": "Model S (with HW2)",
+    "year": [
+      "2017",
+      "2018",
+      "2019"
+    ],
+    "package": "All"
+  },
+  "Tesla Model S (with HW3) 2020-23": {
+    "platform": "TESLA_MODEL_S_HW3",
+    "make": "Tesla",
+    "brand": "tesla",
+    "model": "Model S (with HW3)",
+    "year": [
+      "2020",
+      "2021",
+      "2022",
+      "2023"
+    ],
+    "package": "All"
+  },
+  "Tesla Model S (with HW4) 2024": {
+    "platform": "TESLA_MODEL_S",
+    "make": "Tesla",
+    "brand": "tesla",
+    "model": "Model S (with HW4)",
+    "year": [
+      "2024"
+    ],
+    "package": "All"
+  },
+  "Tesla Model X (with HW1) 2014-16": {
+    "platform": "TESLA_MODEL_X_HW1",
+    "make": "Tesla",
+    "brand": "tesla",
+    "model": "Model X (with HW1)",
+    "year": [
+      "2014",
+      "2015",
+      "2016"
+    ],
+    "package": "All"
+  },
+  "Tesla Model X (with HW2) 2016-19": {
+    "platform": "TESLA_MODEL_X_HW2",
+    "make": "Tesla",
+    "brand": "tesla",
+    "model": "Model X (with HW2)",
+    "year": [
+      "2016",
+      "2017",
+      "2018",
+      "2019"
+    ],
+    "package": "All"
+  },
   "Tesla Model X (with HW4) 2024": {
     "platform": "TESLA_MODEL_X",
     "make": "Tesla",

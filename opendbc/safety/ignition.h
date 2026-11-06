@@ -64,4 +64,22 @@ void ignition_can_hook(const CANPacket_t *msg) {
     }
     prev_counter_vw_meb = counter;
   }
+  // Tesla Model S/X HW1 (AP1) exception — GTW_status on bus 0 or bus 1
+  if ((msg_matches(msg, 0x348U, 0U, 8U)) || (msg_matches(msg, 0x348U, 1U, 8U))) {
+    int counter = msg->data[6] & 0xFU;
+
+    static int prev_counter_tesla_legacy = -1;
+    if ((counter == ((prev_counter_tesla_legacy + 1) % 16)) && (prev_counter_tesla_legacy != -1)) {
+      // GTW_status->GTW_stateDriving
+      ignition_can = (msg->data[0] & 0x1U) != 0U;
+      ignition_can_cnt = 0U;
+    }
+    prev_counter_tesla_legacy = counter;
+  }
+
+  // Tesla body exception — bus 0 or bus 2
+  if (msg_matches(msg, 0x201U, 0U, 8U) || msg_matches(msg, 0x201U, 2U, 8U)) {
+    ignition_can = true;
+    ignition_can_cnt = 0U;
+  }
 }

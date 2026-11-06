@@ -3,7 +3,7 @@ from enum import Enum, IntFlag
 from opendbc.car import Bus, CarSpecs, DbcDict, PlatformConfig, Platforms
 from opendbc.car.lateral import AngleSteeringLimitsVM
 from opendbc.car.structs import CarParams, CarState
-from opendbc.car.docs_definitions import CarDocs, CarFootnote, CarHarness, CarParts, Column, SupportType
+from opendbc.car.docs_definitions import CarDocs, CarFootnote, CarHarness, CarParts, Column
 from opendbc.car.fw_query_definitions import FwQueryConfig, Request, StdQueries
 
 Ecu = CarParams.Ecu
@@ -35,15 +35,10 @@ class TeslaCarDocsHW4(CarDocs):
   car_parts: CarParts = field(default_factory=CarParts.common([CarHarness.tesla_b]))
   footnotes: list[Enum] = field(default_factory=lambda: [Footnote.HW_TYPE, Footnote.SETUP])
 
-@dataclass
-class TeslaCarHW4ModelSXDocs(TeslaCarDocsHW4):
-  support_type: SupportType = SupportType.COMMUNITY
-  support_link: str = "community"
-
 
 @dataclass
 class TeslaPlatformConfig(PlatformConfig):
-  dbc_dict: DbcDict = field(default_factory=lambda: {Bus.party: 'tesla_model3_party', Bus.adas: 'tesla_model3_vehicle'})
+  dbc_dict: DbcDict = field(default_factory=lambda: {Bus.party: 'tesla_model3_party'})
 
 
 class CAR(Platforms):
@@ -65,19 +60,85 @@ class CAR(Platforms):
     {Bus.party: 'tesla_model3_party', Bus.radar: 'tesla_radar_continental_generated', Bus.adas: 'tesla_model3_vehicle'},
   )
   TESLA_MODEL_X = TeslaPlatformConfig(
-    [TeslaCarHW4ModelSXDocs("Tesla Model X (with HW4) 2024")],
+    [TeslaCarDocsHW4("Tesla Model X (with HW4) 2024")],
     CarSpecs(wheelbase=2.960, steerRatio=12.0),
+  )
+  TESLA_MODEL_X_HW1 = TeslaPlatformConfig(
+    [CarDocs("Tesla Model X (with HW1) 2014-16", "All", car_parts=CarParts.common([CarHarness.tesla_model_x_hw1]))],
+    CarSpecs(wheelbase=2.960, steerRatio=15.0),
+    {
+      Bus.chassis: 'tesla_can',
+      Bus.party: 'tesla_can',
+      Bus.pt: 'tesla_can',
+      Bus.radar: 'tesla_radar_bosch_generated',
+    },
+  )
+  TESLA_MODEL_X_HW2 = TeslaPlatformConfig(
+    [CarDocs("Tesla Model X (with HW2) 2016-19", "All", car_parts=CarParts.common([CarHarness.tesla_model_sx_hw2]))],
+    CarSpecs(wheelbase=2.960, steerRatio=15.0),
+    {
+      Bus.chassis: 'tesla_can',
+      Bus.party: 'tesla_can',
+      Bus.pt: 'tesla_powertrain',
+      Bus.radar: 'tesla_radar_bosch_generated',
+    },
+  )
+  TESLA_MODEL_S = TeslaPlatformConfig(
+    [TeslaCarDocsHW4("Tesla Model S (with HW4) 2024")],
+    CarSpecs(wheelbase=2.960, steerRatio=12.0),
+  )
+  TESLA_MODEL_S_HW1 = TeslaPlatformConfig(
+    [CarDocs("Tesla Model S (with HW1) 2014-16", "All", car_parts=CarParts.common([CarHarness.tesla_model_s_hw1]))],
+    CarSpecs(wheelbase=2.960, steerRatio=15.0),
+    {
+      Bus.chassis: 'tesla_can',
+      Bus.party: 'tesla_can',
+      Bus.pt: 'tesla_can',
+      Bus.radar: 'tesla_radar_bosch_generated',
+    },
+  )
+  TESLA_MODEL_S_HW2 = TeslaPlatformConfig(
+    [CarDocs("Tesla Model S (with HW2) 2017-19", "All", car_parts=CarParts.common([CarHarness.tesla_model_sx_hw2]))],
+    CarSpecs(wheelbase=2.960, steerRatio=15.0),
+    {
+      Bus.chassis: 'tesla_can',
+      Bus.party: 'tesla_can',
+      Bus.pt: 'tesla_powertrain',
+      Bus.radar: 'tesla_radar_bosch_generated',
+    },
+  )
+  TESLA_MODEL_S_HW3 = TeslaPlatformConfig(
+    [CarDocs("Tesla Model S (with HW3) 2020-23", "All", car_parts=CarParts.common([CarHarness.tesla_model_sx_hw3]))],
+    CarSpecs(wheelbase=2.960, steerRatio=15.0),
+    {
+      Bus.chassis: 'tesla_can',
+      Bus.party: 'tesla_raven_party',
+      Bus.pt: 'tesla_powertrain',
+      Bus.radar: 'tesla_radar_continental_generated',
+    },
   )
 
 
 FW_QUERY_CONFIG = FwQueryConfig(
-  fw_version_regex=br".+,[EYX]\d?[A-Z]*\d{3}\.\d+(?:\.\d+)?",
+  fw_version_regex=br".+,[EYXS]\d?[A-Z]*\d{3}\.\d+(?:\.\d+)?",
   requests=[
     Request(
       [StdQueries.TESTER_PRESENT_REQUEST, StdQueries.SUPPLIER_SOFTWARE_VERSION_REQUEST],
       [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.SUPPLIER_SOFTWARE_VERSION_RESPONSE],
       bus=0,
-    )
+    ),
+    Request(
+      [StdQueries.TESTER_PRESENT_REQUEST, StdQueries.UDS_VERSION_REQUEST],
+      [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.UDS_VERSION_RESPONSE],
+      rx_offset=0x08,
+      bus=0,
+    ),
+    Request(
+      [StdQueries.TESTER_PRESENT_REQUEST, StdQueries.MANUFACTURER_SOFTWARE_VERSION_REQUEST],
+      [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.MANUFACTURER_SOFTWARE_VERSION_RESPONSE],
+      rx_offset=0x08,
+      bus=0,
+    ),
   ]
 )
 
@@ -100,7 +161,13 @@ FSD_14_FW = {
 class CANBUS:
   party = 0
   vehicle = 1
+  radar = 1
   autopilot_party = 2
+
+  # only needed on raven
+  powertrain = 4
+  chassis = 5
+  autopilot_powertrain = 6
 
 
 GEAR_MAP = {
@@ -126,11 +193,20 @@ class CarControllerParams:
   ACCEL_MIN = -3.48  # m/s^2
   JERK_LIMIT_MAX = 4.9  # m/s^3, ACC faults at 5.0
   JERK_LIMIT_MIN = -4.9  # m/s^3, ACC faults at 5.0
+  JERK_RAMP_RATE = JERK_LIMIT_MAX * 0.002  # m/s^3 per control step, for smooth gas override
+
+
+class TeslaLegacyParams(IntFlag):
+  NO_SDM1 = 1
 
 
 class TeslaSafetyFlags(IntFlag):
   LONG_CONTROL = 1
   FSD_14 = 2
+  FLAG_EXTERNAL_PANDA = 4
+  FLAG_HW1 = 8
+  FLAG_HW2 = 16
+  FLAG_HW3 = 32
 
   # deprecated flags
   DAS_STEERING_3_BIT_DEPRECATED = 2
@@ -149,3 +225,5 @@ class TeslaFlags(IntFlag):
 DBC = CAR.create_dbc_map()
 
 STEER_THRESHOLD = 1
+
+LEGACY_CARS = (CAR.TESLA_MODEL_S_HW1, CAR.TESLA_MODEL_S_HW2, CAR.TESLA_MODEL_S_HW3, CAR.TESLA_MODEL_X_HW1, CAR.TESLA_MODEL_X_HW2)

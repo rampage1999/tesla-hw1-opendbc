@@ -108,8 +108,13 @@ class TestFwFingerprint(unittest.TestCase):
             assert len(ecu_fw) > 0, f'{car_model}: No FW versions: Ecu.{ecu[0]}'
 
   def test_fw_version_format(self):
+    from opendbc.car.tesla.values import LEGACY_CARS
     for brand, config in FW_QUERY_CONFIGS.items():
       for car_model, ecus in VERSIONS[brand].items():
+        # legacy Model S/X (HW1-HW3) EPS FW are raw/binary UDS captures that predate the
+        # modern "vendor,version" string format (same carve-out as car/tesla/tests/test_tesla.py)
+        if brand == 'tesla' and car_model in LEGACY_CARS:
+          continue
         for ecu, fw_versions in ecus.items():
           for fw in fw_versions:
             with self.subTest(brand=brand, car_model=car_model.value, ecu=ecu, fw=fw):
@@ -271,7 +276,7 @@ class TestFwFingerprintTiming(unittest.TestCase):
         print(f'get_vin {name} case, query time={self.total_time / self.N} seconds')
 
   def test_fw_query_timing(self):
-    total_ref_time = 8.3
+    total_ref_time = 8.5
     brand_ref_times = {
       'gm': 1.0,
       'body': 0.1,
@@ -283,7 +288,7 @@ class TestFwFingerprintTiming(unittest.TestCase):
       'mazda': 0.1,
       'nissan': 1.6,
       'subaru': 0.65,
-      'tesla': 0.1,
+      'tesla': 0.3,
       'toyota': 0.7,
       'volkswagen': 0.65,
       'rivian': 0.3,

@@ -1,3 +1,5 @@
+> **Fork notice:** This repository is a fork of [commaai/opendbc](https://github.com/commaai/opendbc), used as a submodule by [sunnypilot](https://github.com/sunnyhaibin/sunnypilot). Built for the purpose of adding **Tesla Hardware 1** support.
+
 <div align="center" style="text-align: center;">
 
 <h1>opendbc</h1>

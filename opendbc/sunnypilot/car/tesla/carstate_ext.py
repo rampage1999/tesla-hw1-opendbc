@@ -44,15 +44,20 @@ class CarStateExt:
 
     cp_ap_party = can_parsers[Bus.ap_party]
 
-    speed_units = self.can_define.dv["DI_state"]["DI_speedUnits"].get(int(cp_party.vl["DI_state"]["DI_speedUnits"]), None)
-    speed_limit = cp_ap_party.vl["DAS_status"]["DAS_fusedSpeedLimit"]
-    if self.can_define.dv["DAS_status"]["DAS_fusedSpeedLimit"].get(int(speed_limit), None) in ["NONE", "UNKNOWN_SNA"]:
-      ret_sp.speedLimit = 0
-    else:
-      if speed_units == "KPH":
-        ret_sp.speedLimit = speed_limit * CV.KPH_TO_MS
-      elif speed_units == "MPH":
-        ret_sp.speedLimit = speed_limit * CV.MPH_TO_MS
+    try:
+      # legacy platforms (Model S/X HW1-HW3) may not carry DI_state/DAS_status on the
+      # party bus; skip speed-limit extraction instead of crashing carstate
+      speed_units = self.can_define.dv["DI_state"]["DI_speedUnits"].get(int(cp_party.vl["DI_state"]["DI_speedUnits"]), None)
+      speed_limit = cp_ap_party.vl["DAS_status"]["DAS_fusedSpeedLimit"]
+      if self.can_define.dv["DAS_status"]["DAS_fusedSpeedLimit"].get(int(speed_limit), None) in ["NONE", "UNKNOWN_SNA"]:
+        ret_sp.speedLimit = 0
+      else:
+        if speed_units == "KPH":
+          ret_sp.speedLimit = speed_limit * CV.KPH_TO_MS
+        elif speed_units == "MPH":
+          ret_sp.speedLimit = speed_limit * CV.MPH_TO_MS
+    except (AssertionError, KeyError):
+      pass
 
   @staticmethod
   def get_parser(CP: structs.CarParams, CP_SP: structs.CarParamsSP) -> dict[StrEnum, CANParser]:
