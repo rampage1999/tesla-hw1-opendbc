@@ -1,5 +1,12 @@
 > **Fork notice:** This repository is a fork of [commaai/opendbc](https://github.com/commaai/opendbc), used as a submodule by [sunnypilot](https://github.com/sunnyhaibin/sunnypilot). Built for the purpose of adding **Tesla Hardware 1** support.
 
+**Branch `tesla-hw1-port`** (this fork's working branch, pinned `ae1901e9`) carries the Tesla HW1
+(Model S/X 2012–2016) port: `teslaLegacy` safety mode, legacy car interfaces, DBC, fingerprints and
+tests. It is the submodule pinned by the metarepo
+[rampage1999/tesla-hw1-port](https://github.com/rampage1999/tesla-hw1-port) — see that repo's
+[`README-PORT.md`](https://github.com/rampage1999/tesla-hw1-port/blob/tesla-hw1-port/README-PORT.md)
+for install steps and verified deployment status.
+
 <div align="center" style="text-align: center;">
 
 <h1>opendbc</h1>
