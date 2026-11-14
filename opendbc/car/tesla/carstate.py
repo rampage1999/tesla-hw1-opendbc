@@ -5,6 +5,9 @@ from opendbc.car import Bus, structs
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.tesla.blindspot import LegacyBlindspot, frames_from_vl_all
+from opendbc.car.tesla.speed_limit import posted_limit
+from opendbc.car.tesla.stalk import stalk_button_events
+from opendbc.car.tesla.steer_fault import steer_fault_temporary
 from opendbc.car.tesla.teslacan import get_steer_ctrl_type
 from opendbc.car.tesla.values import DBC, CANBUS, GEAR_MAP, STEER_THRESHOLD, TeslaFlags, TeslaLegacyParams, CAR, LEGACY_CARS
 
@@ -17,6 +20,7 @@ class CarState(CarStateBase, CarStateExt):
   def __init__(self, CP, CP_SP):
     self._blindspot = LegacyBlindspot()
     self._blindspot_t = None
+    self._prev_stalk_lvr = 0
     CarStateBase.__init__(self, CP, CP_SP)
     CarStateExt.__init__(self, CP, CP_SP)
     self.can_define = CANDefine(DBC[CP.carFingerprint][Bus.party])
@@ -184,11 +188,12 @@ class CarState(CarStateBase, CarStateExt):
     ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > STEER_THRESHOLD, 5)
 
     eac_status = self.can_defines["EPAS_sysStatus"]["EPAS_eacStatus"].get(int(epas_status["EPAS_eacStatus"]), None)
+    eac_error_code = self.can_defines["EPAS_sysStatus"]["EPAS_eacErrorCode"].get(int(epas_status["EPAS_eacErrorCode"]), None)
     ret.steerFaultPermanent = eac_status == "EAC_FAULT"
-    ret.steerFaultTemporary = eac_status == "EAC_INHIBITED"
+    # Latched HANDS_ON / HIGH_ANGLE_REQ must not warn, or 0x488 never returns to ANGLE
+    ret.steerFaultTemporary = steer_fault_temporary(eac_status, eac_error_code)
 
     # FSD disengages using union of handsOnLevel (slow overrides) and high angle rate faults (fast overrides, high speed)
-    eac_error_code = self.can_defines["EPAS_sysStatus"]["EPAS_eacErrorCode"].get(int(epas_status["EPAS_eacErrorCode"]), None)
     ret.steeringDisengage = self.hands_on_level >= 3 or (eac_status == "EAC_INHIBITED" and
                                                          eac_error_code == "EAC_ERROR_HIGH_ANGLE_RATE_SAFETY")
 
@@ -224,6 +229,14 @@ class CarState(CarStateBase, CarStateExt):
       ret.leftBlinker = cp_chassis.vl["GTW_carState"]["BC_indicatorLStatus"] == 1
       ret.rightBlinker = cp_chassis.vl["GTW_carState"]["BC_indicatorRStatus"] == 1
 
+    # Cruise stalk (tip / full tip / pull / push)
+    try:
+      stalk_lvr = int(cp_chassis.vl["STW_ACTN_RQ"]["SpdCtrlLvr_Stat"])
+      ret.buttonEvents = stalk_button_events(stalk_lvr, self._prev_stalk_lvr)
+      self._prev_stalk_lvr = stalk_lvr
+    except KeyError:
+      pass
+
     # Seatbelt
     if self.CP.flags & TeslaLegacyParams.NO_SDM1:
       ret.seatbeltUnlatched = cp_chassis.vl["RCM_status"]["RCM_buckleDriverStatus"] != 1
@@ -245,6 +258,17 @@ class CarState(CarStateBase, CarStateExt):
 
     # Messages needed by carcontroller
     self.das_control = copy.copy(cp_ap_pt.vl["DAS_control"])
+
+    # Posted speed limit: Mobileye fused first, then the car's map/predictive limit
+    try:
+      sl_units = self.can_defines["DI_state"]["DI_speedUnits"].get(int(cp_chassis.vl["DI_state"]["DI_speedUnits"]), None)
+      limit = posted_limit(cp_ap_party.vl["AutopilotStatus"]["DAS_fusedSpeedLimit"], sl_units,
+                           cp_chassis.vl["GTW_carState"]["UI_mppSpeedLimit"],
+                           cp_chassis.vl["GTW_carState"]["UI_mapSpeedLimitUnits"])
+      if limit > 0.0:
+        ret_sp.speedLimit = limit
+    except KeyError:
+      pass
 
     CarStateExt.update(self, ret, ret_sp, can_parsers)
 
