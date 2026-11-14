@@ -5,6 +5,7 @@ from opendbc.car.lateral import apply_steer_angle_limits_vm
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.tesla.engage_ramp import Ap1EngageSteerRamp
 from opendbc.car.tesla.hso import Ap1DriverYield, ap1_lat_active
+from opendbc.car.tesla.long_smooth import Ap1AccelSmoother, ap1_brake_urgent, ap1_fcw
 from opendbc.car.tesla.teslacan import TeslaCAN
 from opendbc.car.tesla.teslacan_legacy import TeslaCANRaven
 from opendbc.car.tesla.values import CarControllerParams, CANBUS, LEGACY_CARS, CAR
@@ -38,6 +39,7 @@ class CarController(CarControllerBase, CoopSteeringCarController):
       self.packers = {CANBUS.party: CANPacker(dbc_names[Bus.party]), CANBUS.powertrain: CANPacker(dbc_names[Bus.pt])}
       self.yield_ = Ap1DriverYield()
       self.steer_ramp = Ap1EngageSteerRamp(dt=0.02)
+      self.accel_smoother = Ap1AccelSmoother()
       self.tesla_can = TeslaCANRaven(self.packers)
       from opendbc.car.tesla.interface import CarInterface
       self.VM = VehicleModel(CarInterface.get_non_essential_params("TESLA_MODEL_S_HW3"))
@@ -76,11 +78,21 @@ class CarController(CarControllerBase, CoopSteeringCarController):
       cntr = (self.frame // 10) % 16
       can_sends.append(self.tesla_can.create_steering_allowed(cntr))
 
+    # Comfort-band accel slew: AP1's brake pedal is friction-only, regen tops out ~1-1.5 m/s^2
+    smoothed_accel = actuators.accel
+    if self.CP.openpilotLongitudinalControl and self.CP.carFingerprint in LEGACY_CARS:
+      smoothed_accel = self.accel_smoother.update(actuators.accel, CC.longActive, CS.out.vEgo,
+                                                  gas_neutral=CS.out.gasPressed,
+                                                  urgent=ap1_brake_urgent(CC.hudControl.visualAlert,
+                                                                          CC.actuators.longControlState),
+                                                  fcw=ap1_fcw(CC.hudControl.visualAlert),
+                                                  a_ego=CS.out.aEgo)
+
     # Longitudinal control
     if self.CP.openpilotLongitudinalControl:
       if self.frame % 4 == 0:
         state = 13 if CC.cruiseControl.cancel else 4  # 4=ACC_ON, 13=ACC_CANCEL_GENERIC_SILENT
-        accel = float(np.clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+        accel = float(np.clip(smoothed_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
         cntr = (self.frame // 4) % 8
         if self.CP.carFingerprint in LEGACY_CARS:
           can_sends.append(self.tesla_can.create_longitudinal_command(state, accel, cntr, CS.out.vEgo, CC.longActive, CS.out.gasPressed))
