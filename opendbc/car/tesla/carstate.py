@@ -1,8 +1,10 @@
 import copy
+import time
 from opendbc.can import CANDefine, CANParser
 from opendbc.car import Bus, structs
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
+from opendbc.car.tesla.blindspot import LegacyBlindspot, frames_from_vl_all
 from opendbc.car.tesla.teslacan import get_steer_ctrl_type
 from opendbc.car.tesla.values import DBC, CANBUS, GEAR_MAP, STEER_THRESHOLD, TeslaFlags, TeslaLegacyParams, CAR, LEGACY_CARS
 
@@ -13,6 +15,8 @@ ButtonType = structs.CarState.ButtonEvent.Type
 
 class CarState(CarStateBase, CarStateExt):
   def __init__(self, CP, CP_SP):
+    self._blindspot = LegacyBlindspot()
+    self._blindspot_t = None
     CarStateBase.__init__(self, CP, CP_SP)
     CarStateExt.__init__(self, CP, CP_SP)
     self.can_define = CANDefine(DBC[CP.carFingerprint][Bus.party])
@@ -225,6 +229,13 @@ class CarState(CarStateBase, CarStateExt):
       ret.seatbeltUnlatched = cp_chassis.vl["RCM_status"]["RCM_buckleDriverStatus"] != 1
     else:
       ret.seatbeltUnlatched = cp_chassis.vl["SDM1"]["SDM_bcklDrivStatus"] != 1
+
+    # Blindspot (stock DAS 0x399, latched for BSM_HOLD_S so a 2.4 Hz frame does not flicker)
+    now = time.monotonic()
+    dt = 0.0 if self._blindspot_t is None else max(0.0, now - self._blindspot_t)
+    self._blindspot_t = now
+    bsm_frames = frames_from_vl_all(cp_ap_party.vl_all) if "AutopilotStatus" in cp_ap_party.vl_all else []
+    ret.leftBlindspot, ret.rightBlindspot = self._blindspot.update(bsm_frames, dt)
 
     # AEB
     ret.stockAeb = cp_ap_pt.vl["DAS_control"]["DAS_aebEvent"] == 1
