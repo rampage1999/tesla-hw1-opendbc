@@ -3,6 +3,8 @@ from opendbc.can import CANPacker
 from opendbc.car import Bus
 from opendbc.car.lateral import apply_steer_angle_limits_vm
 from opendbc.car.interfaces import CarControllerBase
+from opendbc.car.tesla.engage_ramp import Ap1EngageSteerRamp
+from opendbc.car.tesla.hso import Ap1DriverYield, ap1_lat_active
 from opendbc.car.tesla.teslacan import TeslaCAN
 from opendbc.car.tesla.teslacan_legacy import TeslaCANRaven
 from opendbc.car.tesla.values import CarControllerParams, CANBUS, LEGACY_CARS, CAR
@@ -34,6 +36,8 @@ class CarController(CarControllerBase, CoopSteeringCarController):
         CANBUS.autopilot_powertrain = CANBUS.autopilot_party
 
       self.packers = {CANBUS.party: CANPacker(dbc_names[Bus.party]), CANBUS.powertrain: CANPacker(dbc_names[Bus.pt])}
+      self.yield_ = Ap1DriverYield()
+      self.steer_ramp = Ap1EngageSteerRamp(dt=0.02)
       self.tesla_can = TeslaCANRaven(self.packers)
       from opendbc.car.tesla.interface import CarInterface
       self.VM = VehicleModel(CarInterface.get_non_essential_params("TESLA_MODEL_S_HW3"))
@@ -46,11 +50,21 @@ class CarController(CarControllerBase, CoopSteeringCarController):
     # Tesla EPS enforces disabling steering on heavy lateral override force.
     # When enabling in a tight curve, we wait until user reduces steering force to start steering.
     # Canceling is done on rising edge and is handled generically with CC.cruiseControl.cancel
-    lat_active = CC.latActive and CS.hands_on_level < 3
+    if self.CP.carFingerprint in LEGACY_CARS:
+      # HSO: hands at level >= 2 withhold the planner angle without dropping cruise
+      self.yield_.update(CC.enabled, CS.hands_on_level)
+      lat_active = ap1_lat_active(CC.latActive, CS.hands_on_level)
+    else:
+      lat_active = CC.latActive and CS.hands_on_level < 3
 
     if self.frame % 2 == 0:
+      if self.CP.carFingerprint in LEGACY_CARS:
+        # Blend from the measured wheel to the planner angle after engage / hands pause
+        desired_angle = self.steer_ramp.update(lat_active, CS.out.steeringAngleDeg, actuators.steeringAngleDeg)
+      else:
+        desired_angle = actuators.steeringAngleDeg
       # Angular rate limit based on speed
-      self.apply_angle_last = apply_steer_angle_limits_vm(actuators.steeringAngleDeg, self.apply_angle_last, CS.out.vEgoRaw, CS.out.steeringAngleDeg,
+      self.apply_angle_last = apply_steer_angle_limits_vm(desired_angle, self.apply_angle_last, CS.out.vEgoRaw, CS.out.steeringAngleDeg,
                                                           lat_active, CarControllerParams, self.VM)
       if self.CP.carFingerprint in LEGACY_CARS:
         cntr = (self.frame // 2) % 16
